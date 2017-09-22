@@ -86,6 +86,10 @@ export declare abstract class InMemoryBackendConfigArgs {
      * root path _before_ any API call, e.g., ''
      */
     rootPath?: string;
+    /**
+     * Name of PK
+     */
+    idName?: string;
 }
 /**
 *  InMemoryBackendService configuration options

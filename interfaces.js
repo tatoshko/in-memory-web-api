@@ -38,6 +38,7 @@ var InMemoryBackendConfig = (function () {
         if (config === void 0) { config = {}; }
         Object.assign(this, {
             // default config:
+            idName: "uuid",
             caseSensitiveSearch: false,
             dataEncapsulation: true,
             delay: 500,

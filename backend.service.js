@@ -180,6 +180,9 @@ var BackendService = (function () {
             case 'put':
                 resOptions = this.put(reqInfo);
                 break;
+            case 'patch':
+              resOptions = this.patch(reqInfo);
+              break;
             case 'delete':
                 resOptions = this.delete(reqInfo);
                 break;
@@ -304,7 +307,8 @@ var BackendService = (function () {
      * @param id
      */
     BackendService.prototype.findById = function (collection, id) {
-        return collection.find(function (item) { return item.id === id; });
+        var idName = this.config.idName
+        return collection.find(function (item) { return item[idName] === id; });
     };
     /**
      * Generate the next available id for item in this collection
@@ -400,7 +404,8 @@ var BackendService = (function () {
         };
     };
     BackendService.prototype.indexOf = function (collection, id) {
-        return collection.findIndex(function (item) { return item.id === id; });
+      var idName = this.config.idName
+        return collection.findIndex(function (item) { return item[idName] === id; });
     };
     /** Parse the id as a number. Return original value if not a number. */
     BackendService.prototype.parseId = function (collection, collectionName, id) {
@@ -487,12 +492,13 @@ var BackendService = (function () {
     // Create entity
     // Can update an existing entity too if post409 is false.
     BackendService.prototype.post = function (_a) {
+       var idName = this.config.idName
         var collection = _a.collection, collectionName = _a.collectionName, headers = _a.headers, id = _a.id, req = _a.req, resourceUrl = _a.resourceUrl, url = _a.url;
         var item = this.getJsonBody(req);
         // tslint:disable-next-line:triple-equals
-        if (item.id == undefined) {
+        if (item[idName] == undefined) {
             try {
-                item.id = id || this.genId(collection, collectionName);
+                item[idName] = id || this.genId(collection, collectionName);
             }
             catch (err) {
                 var emsg = err.message || '';
@@ -505,11 +511,11 @@ var BackendService = (function () {
                 }
             }
         }
-        if (id && id !== item.id) {
-            return this.createErrorResponseOptions(url, STATUS.BAD_REQUEST, "Request id does not match item.id");
+        if (id && id !== item[idName]) {
+            return this.createErrorResponseOptions(url, STATUS.BAD_REQUEST, "Request id does not match item[idName]");
         }
         else {
-            id = item.id;
+            id = item[idName];
         }
         var existingIx = this.indexOf(collection, id);
         var body = this.bodify(item);
@@ -531,17 +537,18 @@ var BackendService = (function () {
     // Update existing entity
     // Can create an entity too if put404 is false.
     BackendService.prototype.put = function (_a) {
+        var idName = this.config.idName
         var collection = _a.collection, collectionName = _a.collectionName, headers = _a.headers, id = _a.id, req = _a.req, url = _a.url;
         var item = this.getJsonBody(req);
         // tslint:disable-next-line:triple-equals
-        if (item.id == undefined) {
-            return this.createErrorResponseOptions(url, STATUS.NOT_FOUND, "Missing '" + collectionName + "' id");
+        if (item[idName] == undefined) {
+            return this.createErrorResponseOptions(url, STATUS.NOT_FOUND, "Missing '" + collectionName + "' " + idName);
         }
-        if (id && id !== item.id) {
-            return this.createErrorResponseOptions(url, STATUS.BAD_REQUEST, "Request for '" + collectionName + "' id does not match item.id");
+        if (id && id !== item[idName]) {
+            return this.createErrorResponseOptions(url, STATUS.BAD_REQUEST, "Request for '" + collectionName + "' id does not match item." + idName);
         }
         else {
-            id = item.id;
+            id = item[idName];
         }
         var existingIx = this.indexOf(collection, id);
         var body = this.bodify(item);
@@ -561,6 +568,31 @@ var BackendService = (function () {
             return { headers: headers, body: body, status: STATUS.CREATED };
         }
     };
+  // Patch existing entity
+  // Can create an entity too if put404 is false.
+  BackendService.prototype.patch = function (_a) {
+    var idName = this.config.idName
+    var collection = _a.collection, collectionName = _a.collectionName, headers = _a.headers, id = _a.id, req = _a.req, url = _a.url;
+    var item = this.getJsonBody(req);
+    var existingIx = this.indexOf(collection, id);
+    var patched = collection[existingIx]
+
+    for (var key in item) {
+      patched[key] = item[key]
+    }
+
+    var body = this.bodify(patched);
+    if (existingIx > -1) {
+      collection[existingIx] = patched;
+      return this.config.put204 ?
+        { headers: headers, status: STATUS.NO_CONTENT } :
+        { headers: headers, body: body, status: STATUS.OK }; // successful; return entity
+    }
+    else {
+      // item to update not found; use POST to create new item for this id.
+      return this.createErrorResponseOptions(url, STATUS.NOT_FOUND, "'" + collectionName + "' item with id='" + id + " not found and may not be created with PATCH; use POST instead.");
+    }
+  };
     BackendService.prototype.removeById = function (collection, id) {
         var ix = this.indexOf(collection, id);
         if (ix > -1) {
